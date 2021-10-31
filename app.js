@@ -9,98 +9,87 @@ const app = express();
 app.set('view engine','ejs');
 
 app.use(express.static('./public'));
+ 
+const Todo = require('./models/todo.js');
+
+const mongoose = require('mongoose');
 
 app.use(express.urlencoded({ extended: true }));
 
 const uri ='mongodb+srv://sajjad:123saji321@cluster0.3c6ba.mongodb.net/myFirstDatabase?';
-const {MongoClient, ObjectId} = require("mongodb");
-const client = new MongoClient(uri, {useNewUrlParser: true, useUnifiedTopology: true});
 
 console.log('yes');
 
 
+(async () => {
+    await mongoose.connect(uri);
+    console.log('connected');
+  })();
 
-
-
-
-app.get('/',function (req,res)
-{
-    client.connect(async err =>
-        {
-            if (err) throw err;
-            const todolist = client.db("mydbname").collection("todolist");
-            await todolist.find({}).toArray( (err, tasks) => 
-            {     
-                if (err) throw err;
-                res.render('./todo.ejs',{tasks});
-            });
-        });
+  app.get('/', async (req, res) => {
+  const tasks = await Todo.find();
+    res.render('./todo.ejs', {tasks});
 });
+
+
+
+
 
 
 
 
 app.post('/create-task', function(req, res){
 
-    req.body.isChecked = false;
-    client.connect(async err =>
-    {
-        if (err) throw err;
-        const todolist = client.db("mydbname").collection("todolist");
-        await todolist.insertOne(req.body, (err, result) =>
-        {
-            if (err) throw err;
-            if(result.acknowledged)
-                console.log("task saved");
-            else
-                console.log("sorry something went wrong");
+    var list = new Todo({
+        task: req.body.task,
+      
+    })
+      
+   list.save(function(err,result){
+        if (err){
+            console.log(err);
+        }
+        else{
+            console.log(result)
             res.redirect('/');
-        });
-    });
+        }
+    })
 
 });
 
 
-
-
 app.get('/delete-task/:id', (req,res) =>
 {
-    
-    client.connect(async err =>
-    {
-        const id = 'new ObjectId("' + req.params.id + '.toString()")';
-        console.log(req.params);
-        if (err) throw err;
-        const todolist = client.db("mydbname").collection("todolist");
-        todolist.deleteOne({"_id" : new ObjectId(req.params.id)}, (err, result) =>
-        {
-            if (err) throw err;
-            if(result.acknowledged)
-                console.log("task has deleted");
-            else
-                console.log("sorry something went wrong");
-            res.redirect('/');
-        });
-    })
+    Todo.remove({_id: req.params.id}, function(err){
+        if(err) res.json(err);      
+          res.redirect('/');
+      });
 })
 
 
 
 app.get('/toggleTodoChecked/:_id/:isChecked', (req,res) =>
 {
-   
+    Todo.findById(req.params._id, function(err, p) {
+        if (!p)
+          return next(new Error('Could not load Document'));
+        else {
+          // do your updates here
+          p.isChecked = req.params.isChecked;
+      
+          p.save(function(err) {
+            if (err)
+              console.log('error')
+            else
+              console.log('success')
+              res.redirect('/');
+          });
+        }
+      });
     
-    const todolist = client.db("mydbname").collection("todolist");
-    const isChecked = req.params.isChecked === 'true';
-    todolist.updateOne({"_id" : new ObjectId(req.params._id)}, {$set : {"isChecked" : isChecked}} , (err, result) =>
-    {
-        if (err) throw err;
-        if(result.acknowledged)
-            console.log("task updated");
-        else
-            console.log("sorry something went wrong");
-    });
-    res.redirect('/');
+  
+
+    
 })
 
 
